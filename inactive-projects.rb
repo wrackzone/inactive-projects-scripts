@@ -161,11 +161,6 @@ class RallyInactiveProjects
 
 				artifacts = find_artifacts_since project,@active_since
 				
-				# if project["Owner"] != nil
-				# 	user = find_user( project["Owner"].ObjectID)
-				# else
-				# 	user = nil
-				# end
 				user = project["Owner"] ? find_user( project["Owner"].ObjectID) : nil
 
 				userdisplay = user != nil ?  user["UserName"] : "(None)" 
@@ -182,11 +177,6 @@ class RallyInactiveProjects
 				emaildisplay = user != nil ? user["EmailAddress"] : "(None)" 
 				print "Project:#{project["Name"]} \t#{userdisplay} \tArtifacts since:\t#{artifacts.length}\n"
 
-				# tm = project["TeamMembers"].size
-				# project["TeamMembers"].each { |tm| 
-				# 	print "\n",tm,"\n"
-				# }
-				# print "\n",tm,"\n"
 				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length]
 			}
 		end
