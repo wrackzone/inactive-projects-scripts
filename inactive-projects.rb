@@ -187,8 +187,9 @@ class RallyInactiveProjects
 				# 	print "\n",tm,"\n"
 				# }
 				# print "\n",tm,"\n"
-				creationDate = project["CreationDate"].to_date
-				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length,project["CreationDate"]]
+				creationDate = project["CreationDate"]
+				date = Time.parse(creationDate).strftime("%m/%d/%Y")
+				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length,date]
 			}
 		end
 	end
