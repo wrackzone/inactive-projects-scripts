@@ -2,9 +2,7 @@
 # Barry Mullan, Rally Software (December 2014)
 
 require 'rubygems'
-# require 'nokogiri'
 require 'rally_api'
-# require 'markaby'
 require 'json'
 require 'csv'
 
@@ -30,7 +28,9 @@ class RallyInactiveProjects
 		config_hash = JSON.parse(file)
 
 		config = {:base_url => "https://rally1.rallydev.com/slm"}
-		config[:api_key]   = config_hash["api-key"] 
+		# config[:username]   = "bmullan@rallydev.com"
+		# config[:password]   = "RallyON!"
+		config[:api_key]   = config_hash["api-key"] # "_y9sB5fixTWa1V36PTkOS8QOBpQngF0DNvndtpkw05w8"
 		config[:workspace] = config_hash["workspace"]
 		config[:headers]    = headers #from RallyAPI::CustomHttpHeader.new()
 
@@ -98,7 +98,7 @@ class RallyInactiveProjects
 
 		test_query = RallyAPI::RallyQuery.new()
 		test_query.type = "project"
-		test_query.fetch = "Name,Parent,State,ObjectID,Owner,TeamMembers,Children"
+		test_query.fetch = "Name,Parent,State,ObjectID,Owner,TeamMembers,Children,CreationDate"
 		test_query.page_size = 200       #optional - default is 200
 		# test_query.limit = 1000          #optional - default is 99999
 		test_query.project_scope_up = false
@@ -151,16 +151,21 @@ class RallyInactiveProjects
 		print "Found #{projects.length} projects\n"
 
 		CSV.open(@csv_file_name, "wb") do |csv|
-	  		csv << ["Project","Owner","EmailAddress","Parent","Artifacts"]
+	  		csv << ["Project","Owner","EmailAddress","Parent","Artifacts","CreationDate"]
 			projects.each { |project| 
 
 				# Omit projects with open child projects
 				openChildren = project["Children"].reject { |child| child["State"] == "Closed" }
 				# print project["Name"],openChildren.length,"\n"
-				next if (openChildren.length > 0)
+				next if openChildren.length > 0
 
 				artifacts = find_artifacts_since project,@active_since
 				
+				# if project["Owner"] != nil
+				# 	user = find_user( project["Owner"].ObjectID)
+				# else
+				# 	user = nil
+				# end
 				user = project["Owner"] ? find_user( project["Owner"].ObjectID) : nil
 
 				userdisplay = user != nil ?  user["UserName"] : "(None)" 
@@ -177,7 +182,13 @@ class RallyInactiveProjects
 				emaildisplay = user != nil ? user["EmailAddress"] : "(None)" 
 				print "Project:#{project["Name"]} \t#{userdisplay} \tArtifacts since:\t#{artifacts.length}\n"
 
-				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length]
+				# tm = project["TeamMembers"].size
+				# project["TeamMembers"].each { |tm| 
+				# 	print "\n",tm,"\n"
+				# }
+				# print "\n",tm,"\n"
+				creationDate = project["CreationDate"].to_date
+				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length,project["CreationDate"]]
 			}
 		end
 	end
