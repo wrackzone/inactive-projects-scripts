@@ -28,8 +28,8 @@ class RallyInactiveProjects
 		config_hash = JSON.parse(file)
 
 		config = {:base_url => "https://rally1.rallydev.com/slm"}
-		# config[:username]   = "bmullan@rallydev.com"
-		# config[:password]   = "RallyON!"
+		# config[:username]   = "username@rallydev.com"
+		# config[:password]   = "pwd"
 		config[:api_key]   = config_hash["api-key"] # "_y9sB5fixTWa1V36PTkOS8QOBpQngF0DNvndtpkw05w8"
 		config[:workspace] = config_hash["workspace"]
 		config[:headers]    = headers #from RallyAPI::CustomHttpHeader.new()
@@ -187,9 +187,9 @@ class RallyInactiveProjects
 				# 	print "\n",tm,"\n"
 				# }
 				# print "\n",tm,"\n"
-				creationDate = project["CreationDate"]
-				date = Time.parse(creationDate).strftime("%m/%d/%Y")
-				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length,date]
+				creationDate = Time.parse(project["CreationDate"]).strftime("%m/%d/%Y")
+				#date = Time.parse(creationDate).strftime("%m/%d/%Y")
+				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length,creationDate]
 			}
 		end
 	end
