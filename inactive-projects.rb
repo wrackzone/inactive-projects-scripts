@@ -2,11 +2,12 @@
 # Barry Mullan, Rally Software (December 2014)
 
 require 'rubygems'
-# require 'nokogiri'
+require 'nokogiri'
 require 'rally_api'
-# require 'markaby'
+require 'markaby'
 require 'json'
 require 'csv'
+require 'logger'
 
 class RallyInactiveProjects
 
@@ -30,17 +31,52 @@ class RallyInactiveProjects
 		config_hash = JSON.parse(file)
 
 		config = {:base_url => "https://rally1.rallydev.com/slm"}
-		config[:api_key]   = config_hash["api-key"] 
+		# config[:username]   = "user.name@domain.com"
+		# config[:password]   = "Password"
+		config[:api_key]   = config_hash["api-key"] # "_y9sB5fixTWa1V36PTkOS8QOBpQngF0DNvndtpkw05w8"
 		config[:workspace] = config_hash["workspace"]
 		config[:headers]    = headers #from RallyAPI::CustomHttpHeader.new()
 
 		@rally = RallyAPI::RallyRestJson.new(config)
-		@workspace = find_workspace(config[:workspace])
-		@active_since = Time.parse(config_hash["active-since"]).utc.iso8601
-		@csv_file_name = config_hash["csv-file-name"]
+		@workspace 									= find_workspace(config[:workspace])
+		@active_since 							= Time.parse(config_hash['active-since']).utc.iso8601
+		@most_recent_creation_date	= Time.parse(config_hash['most_recent_creation_date']).utc.iso8601
+		@csv_file_name 							= config_hash['csv-file-name']
 
-		print "Workspace:#{@workspace["Name"]} active-since:#{@active_since}\n"
+		# Logger ------------------------------------------------------------
+		@logger 				          	= Logger.new('./inactive_projects.log')
+		@logger.progname 						= "Inactive Projects"
+		@logger.level 		        	= Logger::DEBUG # UNKNOWN | FATAL | ERROR | WARN | INFO | DEBUG
 
+		@logger.info "Workspace:#{@workspace['Name']} active-since:#{@active_since}\n"
+	end
+
+	def close_project(project)
+		begin
+			@logger.info "Closing #{project.name}"
+
+			# check if there are any open child projects
+			openChildren = project['Children'].reject { |child| child['State'] == 'Closed' }
+			if openChildren.length > 0 then
+				@logger.info "Project has [#{openChildren.length.to_s}] open child project#{openChildren.length > 1 ? 's' : ''}. Cannot close a parent project with open child projects"
+				@logger.warn "Could not close Project[#{project.name}] because it had open child projects."
+			else
+				fields = {}
+				fields[:state] = 'Closed'
+				fields[:description] = close_reason(project)
+
+				project.update(fields)
+				@logger.info("Closed Project[#{project.name}]")
+			end
+
+		rescue Exception => e
+			@logger.debug "Exception Closing Project[#{project.name}]\n\tMessage:#{e.message}"
+		end
+	end
+
+	# pre-pend closing reason to the description.
+	def close_reason(project)
+		return "Project[#{project.name}] closed on #{Time.now.utc} due to ZERO activity since #{@active_since}\n #{project.description.to_s}"
 	end
 
 	def find_workspace(name)
@@ -64,7 +100,7 @@ class RallyInactiveProjects
 
 		test_query = RallyAPI::RallyQuery.new()
 		test_query.type = "project"
-		test_query.fetch = "Name,ObjectID"
+		test_query.fetch = "Name,ObjectID,CreationDate"
 		test_query.page_size = 200       #optional - default is 200
 		test_query.limit = 1000          #optional - default is 99999
 		test_query.project_scope_up = false
@@ -94,23 +130,23 @@ class RallyInactiveProjects
 		return results.first
 	end
 
-	def find_projects
+	def find_projects (most_recent_creation_date)
 
 		test_query = RallyAPI::RallyQuery.new()
 		test_query.type = "project"
-		test_query.fetch = "Name,Parent,State,ObjectID,Owner,TeamMembers,Children"
+		test_query.fetch = "Name,Parent,State,ObjectID,Owner,TeamMembers,Children,CreationDate"
 		test_query.page_size = 200       #optional - default is 200
 		# test_query.limit = 1000          #optional - default is 99999
 		test_query.project_scope_up = false
 		test_query.project_scope_down = false
 		test_query.order = "Name Asc"
-		# test_query.query_string = "(Name = \"#{name}\")"
+		test_query.query_string = "(CreationDate <  \"#{most_recent_creation_date}\")"
 		test_query.workspace = @workspace
 
 		results = @rally.find(test_query)
 	end
 
-	def find_artifacts_since project,active_since
+	def find_artifacts_since (project,active_since)
 
 		test_query = RallyAPI::RallyQuery.new()
 		test_query.type = "artifact"
@@ -147,20 +183,28 @@ class RallyInactiveProjects
 	end
 
 	def run
-		projects = find_projects
+		start_time = Time.now
+
+		projects = find_projects(@most_recent_creation_date)
 		print "Found #{projects.length} projects\n"
+		@logger.info "Found #{projects.length} projects\n"
 
 		CSV.open(@csv_file_name, "wb") do |csv|
-	  		csv << ["Project","Owner","EmailAddress","Parent","Artifacts"]
+			csv << ["Project","Owner","EmailAddress","Parent","Artifacts Since(#{@active_since})","Project Creation Date"]
 			projects.each { |project| 
 
 				# Omit projects with open child projects
-				openChildren = project["Children"].reject { |child| child["State"] == "Closed" }
+				openChildren = project['Children'].reject { |child| child['State'] == 'Closed' }
 				# print project["Name"],openChildren.length,"\n"
-				next if (openChildren.length > 0)
+				next if openChildren.length > 0
 
 				artifacts = find_artifacts_since project,@active_since
 				
+				# if project["Owner"] != nil
+				# 	user = find_user( project["Owner"].ObjectID)
+				# else
+				# 	user = nil
+				# end
 				user = project["Owner"] ? find_user( project["Owner"].ObjectID) : nil
 
 				userdisplay = user != nil ?  user["UserName"] : "(None)" 
@@ -175,16 +219,35 @@ class RallyInactiveProjects
 				end
 
 				emaildisplay = user != nil ? user["EmailAddress"] : "(None)" 
-				print "Project:#{project["Name"]} \t#{userdisplay} \tArtifacts since:\t#{artifacts.length}\n"
+				print "Project:#{project["Name"]}\tCreated:#{project['CreationDate']}\tOwner:#{userdisplay} \tArtifacts Updated Since(#{@active_since}):\t#{artifacts.length}\n"
+				@logger.info "Project:#{project["Name"]}\tCreated:#{project['CreationDate']}\tOwner:#{userdisplay} \tArtifacts Updated Since(#{@active_since}):\t#{artifacts.length}\n"
 
-				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length]
+				# tm = project["TeamMembers"].size
+				# project["TeamMembers"].each { |tm| 
+				# 	print "\n",tm,"\n"
+				# }
+				# print "\n",tm,"\n"
+				projectCreationDate = Time.parse(project["CreationDate"]).strftime("%m/%d/%Y")
+				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length,projectCreationDate]
+
+				##### If you wanted to automatically close projects with ZERO (0) artifacts updated since the @active_since date, UNCOMMENT the following
+				# begin
+				#   if artifacts.length == 0
+				#     close_project(project)
+				#   end
+				# rescue Exception => e
+				#   @logger.debug "Error closing project[#{project.name}]. Message: #{e.message}"
+				# end
+
 			}
 		end
+		@logger.info "Finished: elapsed time #{'%.1f' % ((Time.now - start_time)/60)} minutes."
 	end
 end
 
 if (!ARGV[0])
 	print "Usage: ruby inactive-projects.rb config_file_name.json\n"
+	@logger.info "Usage: ruby inactive-projects.rb config_file_name.json\n"
 else
 	rtr = RallyInactiveProjects.new ARGV[0]
 	rtr.run
