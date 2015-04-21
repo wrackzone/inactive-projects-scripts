@@ -30,7 +30,7 @@ class RallyInactiveProjects
 		config = {:base_url => "https://rally1.rallydev.com/slm"}
 		# config[:username]   = "username@rallydev.com"
 		# config[:password]   = "pwd"
-		config[:api_key]   = config_hash["api-key"] # "_y9sB5fixTWa1V36PTkOS8QOBpQngF0DNvndtpkw05w8"
+		config[:api_key]   = config_hash["api-key"] 
 		config[:workspace] = config_hash["workspace"]
 		config[:headers]    = headers #from RallyAPI::CustomHttpHeader.new()
 
