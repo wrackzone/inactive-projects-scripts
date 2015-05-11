@@ -1,6 +1,6 @@
 {
 	"api-key" : "Paste in your api-key",
-	"workspace" : "American Express Workspace",
+	"workspace" : "workspace name",
 	"active-since" : "02/01/2015",
 	"csv-file-name" : "projects.csv"
 }
