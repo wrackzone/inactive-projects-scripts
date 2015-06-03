@@ -1,0 +1,5 @@
+Project,Owner,EmailAddress,Parent,Artifacts
+Sample Project,Colin,cobrien+tamue@rallydev.com,,0
+Team A,Barry,bmullan@rallydev.com,FeatureMap,5
+Team B,(None),(None),FeatureMap,1
+Team C,Barry,bmullan@rallydev.com,FeatureMap,0

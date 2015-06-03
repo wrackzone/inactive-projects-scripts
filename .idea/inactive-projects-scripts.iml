@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module type="RUBY_MODULE" version="4">
+  <component name="NewModuleRootManager">
+    <content url="file://$MODULE_DIR$" />
+    <orderEntry type="inheritedJdk" />
+    <orderEntry type="sourceFolder" forTests="false" />
+    <orderEntry type="library" scope="PROVIDED" name="bigdecimal (v1.2.0, ruby-2.0.0-p0) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="builder (v3.2.2, ruby-2.0.0-p0) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="httpclient (v2.4.0, ruby-2.0.0-p0) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="markaby (v0.8.0, ruby-2.0.0-p0) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="mini_portile (v0.6.0, ruby-2.0.0-p0) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="nokogiri (v1.6.3.1, ruby-2.0.0-p0) [gem]" level="application" />
+    <orderEntry type="library" scope="PROVIDED" name="rally_api (v1.1.2, ruby-2.0.0-p0) [gem]" level="application" />
+  </component>
+</module>
