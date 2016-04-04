@@ -35,13 +35,16 @@ class RallyInactiveProjects
 		# config[:password]   = "Password"
 		config[:api_key]   = config_hash["api-key"] # "_y9sB5fixTWa1V36PTkOS8QOBpQngF0DNvndtpkw05w8"
 		config[:workspace] = config_hash["workspace"]
+
 		config[:headers]    = headers #from RallyAPI::CustomHttpHeader.new()
 
 		@rally = RallyAPI::RallyRestJson.new(config)
+		@workspace_name = config_hash["workspace"]
 		@workspace 									= find_workspace(config[:workspace])
 		@active_since 							= Time.parse(config_hash['active-since']).utc.iso8601
 		@most_recent_creation_date	= Time.parse(config_hash['most_recent_creation_date']).utc.iso8601
 		@csv_file_name 							= config_hash['csv-file-name']
+		@all_workspaces = config_hash["all-workspaces"]
 
 		# Logger ------------------------------------------------------------
 		@logger 				          	= Logger.new('./inactive_projects.log')
@@ -270,17 +273,27 @@ class RallyInactiveProjects
 		start_time = Time.now
 
 		sub = find_subscription()
-		print sub["Name"],"\n"
+		print sub["Name"],"\t",@all_workspaces,"\n"
 
 		CSV.open(@csv_file_name, "wb") do |csv|
 			csv << ["Workspace","Project","Owner","EmailAddress","Parent","Artifacts Since(#{@active_since})","Project Creation Date"]
 			sub["Workspaces"].each { |ws|
-				print "\t",ws["Name"],"\n"
+				# print "\t",ws["Name"],"\n"
 				csv << [ws["Name"]]
-				if ws["State"] == "Open"
+				if ws["State"] == "Open" 
 					begin
-						process_workspace(ws,csv)
+						if @all_workspaces != "true" then
+							# print "'",ws["Name"],"'\t'",@workspace_name,"'",ws["Name"].eql?(@workspace_name),"\n"
+							if ws["Name"].eql? @workspace_name then
+								print "\t\t",ws["Name"],"\n"
+								process_workspace(ws,csv)
+							end
+						else
+							print "\t\t",ws["Name"],"\n"
+							process_workspace(ws,csv)
+						end
 					rescue
+						print "rescue\n"
 						next
 					end
 				end
