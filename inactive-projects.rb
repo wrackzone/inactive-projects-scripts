@@ -95,6 +95,23 @@ class RallyInactiveProjects
 
 		return results.first
 	end
+
+	def find_subscription()
+
+		test_query = RallyAPI::RallyQuery.new()
+		test_query.type = "subscription"
+		test_query.fetch = "Name,ObjectID,Workspaces"
+		test_query.page_size = 200       #optional - default is 200
+		# test_query.limit = 1000          #optional - default is 99999
+		test_query.project_scope_up = false
+		test_query.project_scope_down = true
+		test_query.order = "Name Asc"
+		#test_query.query_string = "(Name = \"#{name}\")"
+
+		results = @rally.find(test_query)
+
+		return results.first
+	end
 	
 	def find_project(name)
 
@@ -130,6 +147,21 @@ class RallyInactiveProjects
 		return results.first
 	end
 
+	def find_parent_projects (ws)
+
+		test_query = RallyAPI::RallyQuery.new()
+		test_query.type = "project"
+		test_query.fetch = "Name,Parent,State,ObjectID,Owner,TeamMembers,Children,CreationDate"
+		test_query.page_size = 200       #optional - default is 200
+		# test_query.limit = 1000          #optional - default is 99999
+		test_query.project_scope_up = false
+		test_query.project_scope_down = false
+		test_query.order = "Name Asc"
+		test_query.query_string = "((State =  \"Open\") and (Parent = null))"
+		test_query.workspace = ws
+		results = @rally.find(test_query)
+	end
+
 	def find_projects (most_recent_creation_date)
 
 		test_query = RallyAPI::RallyQuery.new()
@@ -140,13 +172,13 @@ class RallyInactiveProjects
 		test_query.project_scope_up = false
 		test_query.project_scope_down = false
 		test_query.order = "Name Asc"
-		test_query.query_string = "(CreationDate <  \"#{most_recent_creation_date}\")"
+		#test_query.query_string = "(CreationDate <  \"#{most_recent_creation_date}\")"
 		test_query.workspace = @workspace
 
 		results = @rally.find(test_query)
 	end
 
-	def find_artifacts_since (project,active_since)
+	def find_artifacts_since (ws,project,active_since)
 
 		test_query = RallyAPI::RallyQuery.new()
 		test_query.type = "artifact"
@@ -155,10 +187,10 @@ class RallyInactiveProjects
 		# test_query.limit = 1000          #optional - default is 99999
 		test_query.project = project
 		test_query.project_scope_up = false
-		test_query.project_scope_down = false
+		test_query.project_scope_down = true
 		# test_query.order = "Name Asc"
 		test_query.query_string = "(LastUpdateDate >= \"#{active_since}\")"
-		test_query.workspace = @workspace
+		test_query.workspace = ws #@workspace
 
 		results = @rally.find(test_query)
 	end
@@ -182,23 +214,23 @@ class RallyInactiveProjects
 
 	end
 
-	def run
-		start_time = Time.now
+	def process_workspace(ws,csv)
 
-		projects = find_projects(@most_recent_creation_date)
-		print "Found #{projects.length} projects\n"
-		@logger.info "Found #{projects.length} projects\n"
+		projects = find_parent_projects(ws)
 
-		CSV.open(@csv_file_name, "wb") do |csv|
-			csv << ["Project","Owner","EmailAddress","Parent","Artifacts Since(#{@active_since})","Project Creation Date"]
-			projects.each { |project| 
+		# ws["Projects"].each { |project| 
+		projects.each { |project|
+				next if project["State"] == "Closed"
+
+				next if project["Parent"] != nil
 
 				# Omit projects with open child projects
 				openChildren = project['Children'].reject { |child| child['State'] == 'Closed' }
 				# print project["Name"],openChildren.length,"\n"
 				next if openChildren.length > 0
 
-				artifacts = find_artifacts_since project,@active_since
+				artifacts = find_artifacts_since ws,project,@active_since
+				# artifacts = []
 				
 				# if project["Owner"] != nil
 				# 	user = find_user( project["Owner"].ObjectID)
@@ -219,26 +251,35 @@ class RallyInactiveProjects
 				end
 
 				emaildisplay = user != nil ? user["EmailAddress"] : "(None)" 
-				print "Project:#{project["Name"]}\tCreated:#{project['CreationDate']}\tOwner:#{userdisplay} \tArtifacts Updated Since(#{@active_since}):\t#{artifacts.length}\n"
+				#print "Project:#{project["Name"]}\tCreated:#{project['CreationDate']}\tOwner:#{userdisplay} \tArtifacts Updated Since(#{@active_since}):\t#{artifacts.length}\n"
+				print "."
 				@logger.info "Project:#{project["Name"]}\tCreated:#{project['CreationDate']}\tOwner:#{userdisplay} \tArtifacts Updated Since(#{@active_since}):\t#{artifacts.length}\n"
 
-				# tm = project["TeamMembers"].size
-				# project["TeamMembers"].each { |tm| 
-				# 	print "\n",tm,"\n"
-				# }
-				# print "\n",tm,"\n"
 				projectCreationDate = Time.parse(project["CreationDate"]).strftime("%m/%d/%Y")
-				csv << [project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length,projectCreationDate]
+				csv << [ws["Name"],project["Name"], userdisplay,emaildisplay, project["Parent"],artifacts.length,projectCreationDate]
+		}
+		print "\n"
 
-				##### If you wanted to automatically close projects with ZERO (0) artifacts updated since the @active_since date, UNCOMMENT the following
-				# begin
-				#   if artifacts.length == 0
-				#     close_project(project)
-				#   end
-				# rescue Exception => e
-				#   @logger.debug "Error closing project[#{project.name}]. Message: #{e.message}"
-				# end
+	end	
 
+	def run
+		start_time = Time.now
+
+		sub = find_subscription()
+		print sub["Name"],"\n"
+
+		CSV.open(@csv_file_name, "wb") do |csv|
+			csv << ["Workspace","Project","Owner","EmailAddress","Parent","Artifacts Since(#{@active_since})","Project Creation Date"]
+			sub["Workspaces"].each { |ws|
+				print "\t",ws["Name"],"\n"
+				csv << [ws["Name"]]
+				if ws["State"] == "Open"
+					begin
+						process_workspace(ws,csv)
+					rescue
+						next
+					end
+				end
 			}
 		end
 		@logger.info "Finished: elapsed time #{'%.1f' % ((Time.now - start_time)/60)} minutes."
