@@ -157,7 +157,8 @@ class RallyInactiveProjects
 		test_query.project_scope_up = false
 		test_query.project_scope_down = false
 		test_query.order = "Name Asc"
-		test_query.query_string = "((State =  \"Open\") and (Parent = null))"
+		# test_query.query_string = "((State =  \"Open\") and (Parent = null))"
+		test_query.query_string = "(State =  \"Open\")"
 		test_query.workspace = ws
 		results = @rally.find(test_query)
 	end
@@ -187,7 +188,8 @@ class RallyInactiveProjects
 		# test_query.limit = 1000          #optional - default is 99999
 		test_query.project = project
 		test_query.project_scope_up = false
-		test_query.project_scope_down = true
+		test_query.project_scope_down = false
+		# test_query.project_scope_down = true
 		# test_query.order = "Name Asc"
 		test_query.query_string = "(LastUpdateDate >= \"#{active_since}\")"
 		test_query.workspace = ws #@workspace
@@ -222,12 +224,14 @@ class RallyInactiveProjects
 		projects.each { |project|
 				next if project["State"] == "Closed"
 
-				next if project["Parent"] != nil
+				# uncomment to report on top level only
+				#next if project["Parent"] != nil
 
 				# Omit projects with open child projects
 				openChildren = project['Children'].reject { |child| child['State'] == 'Closed' }
 				# print project["Name"],openChildren.length,"\n"
-				next if openChildren.length > 0
+				
+				# next if openChildren.length > 0
 
 				artifacts = find_artifacts_since ws,project,@active_since
 				# artifacts = []
